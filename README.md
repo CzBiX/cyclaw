@@ -16,6 +16,10 @@ graph TD
     Tools --> Scheduler["Cron Scheduler"]
     Scheduler -->|"fires tasks"| Router
     Tools --> Sender["Channel Sender"]
+    Tools -->|"sub_task"| SubTask["Sub-Task<br/>Isolated Session"]
+    SubTask -->|"resolves agent"| Router
+    SubTask --> SubLoop["Sub-Agent Loop<br/>Prompt → LLM → Tools → Repeat"]
+    SubLoop -->|"result"| Tools
     Prompt["Prompt Builder"] --> Loop
     Sessions["Session Store"] --> Loop
     Scheduler -->|"scheduled"| Reflection["Self-Reflection"]
@@ -35,5 +39,6 @@ graph TD
 - **Channel Abstraction** — Decoupled from platform via a sender interface. Supports user allowlisting, verbose tool-call logging, and reply context passthrough.
 - **Path Sandbox** — File access scoped to designated directories for agent files, memory, skills, and workspace, with directory traversal protection.
 - **Embedded Defaults** — Agent definitions, skills, and memory templates compiled into the binary, extracted on first run without overwriting user modifications.
+- **Sub-Task Delegation** —  Any agent can delegate a focused task to another agent (or itself) that runs a full LLM-tool loop in an isolated session, which enables multi-agent orchestration.
 - **Feature Gating** — Individual tools and the scheduler can be toggled via config. Extra provider-specific tool types can be added for built-in provider tools.
 - **Configuration** — YAML-based config with support for per-agent model overrides, reasoning effort tuning, and forced streaming. Supports containerized deployment.
