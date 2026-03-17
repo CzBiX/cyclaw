@@ -23,6 +23,8 @@ import (
 	"cyclaw/internal/tool"
 )
 
+const version = "dev"
+
 func loadConfig() *config.Config {
 	configArg := ""
 	if len(os.Args) > 1 {
