@@ -113,6 +113,11 @@ func run(cfg *config.Config) error {
 		return err
 	}
 
+	// Register sub_task tool. This is done after agent registration so that
+	// the router can resolve target agents. Since the registry is shared by
+	// pointer, the tool is available to all agents when they read LLMDefs().
+	tools.Register(tool.NewSubTaskTool(&subTaskAdapter{router: router}, tools))
+
 	// Start scheduler
 	if err := sched.Start(); err != nil {
 		return fmt.Errorf("start scheduler: %w", err)
@@ -237,4 +242,17 @@ func registerAgents(ctx context.Context, cfg *config.Config, router *agent.Route
 		slog.Debug("agent registered", "id", agentCfg.Id, "default", agentCfg.Default)
 	}
 	return nil
+}
+
+// subTaskAdapter bridges agent.Router to the tool.SubTaskExecutor interface.
+type subTaskAdapter struct {
+	router *agent.Router
+}
+
+func (a *subTaskAdapter) ExecuteSubTask(ctx context.Context, agentName string, task string, instructions string, tools *tool.Registry) (string, error) {
+	ag, ok := a.router.GetAgent(agentName)
+	if !ok {
+		return "", fmt.Errorf("agent not found: %s", agentName)
+	}
+	return ag.HandleSubTask(ctx, task, instructions, tools)
 }

@@ -21,9 +21,16 @@ func NewBuilder(resolver *Resolver) *Builder {
 	return &Builder{resolver: resolver}
 }
 
+// AgentInfo describes an agent for inclusion in the system prompt.
+type AgentInfo struct {
+	Id      string
+	Current bool // true if this is the agent receiving the prompt
+}
+
 // AgentFiles holds the paths for an agent's core definition files.
 type AgentFiles struct {
-	Id string
+	Id     string
+	Agents []AgentInfo // all registered agents
 }
 
 // BuildSystemPrompt assembles the complete system prompt for an agent.
@@ -33,6 +40,9 @@ func (b *Builder) BuildSystemPrompt(agentFiles AgentFiles, skills []*skill.Skill
 
 	parts = append(parts, b.loadAgentCoreFiles(agentFiles))
 	parts = append(parts, b.loadSkillsSummary(skills))
+	if agentsList := buildAgentsList(agentFiles.Agents); agentsList != "" {
+		parts = append(parts, agentsList)
+	}
 	parts = append(parts, b.loadLongTermMemory())
 	if msg.ChannelPrompt != "" {
 		parts = append(parts, msg.ChannelPrompt)
@@ -73,6 +83,26 @@ func (b *Builder) loadLongTermMemory() string {
 
 func (b *Builder) loadSkillsSummary(skills []*skill.Skill) string {
 	return skill.BuildPrompt(skills)
+}
+
+// buildAgentsList renders the available agents section for the system prompt.
+// This lets the LLM know which agents can be targeted with the sub_task tool.
+func buildAgentsList(agents []AgentInfo) string {
+	if len(agents) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("# Agents\n\n")
+	sb.WriteString("Available agents for delegation via the `sub_task` tool:\n\n")
+	for _, a := range agents {
+		marker := ""
+		if a.Current {
+			marker = " (you)"
+		}
+		sb.WriteString(fmt.Sprintf("- **%s**%s\n", a.Id, marker))
+	}
+	return sb.String()
 }
 
 func (b *Builder) buildContext(msg *channel.IncomingMessage) string {

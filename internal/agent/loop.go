@@ -9,75 +9,33 @@ import (
 	"cyclaw/internal/channel"
 	"cyclaw/internal/llm"
 	"cyclaw/internal/prompt"
+	"cyclaw/internal/session"
 	"cyclaw/internal/tool"
 )
 
-// HandleMessage processes an incoming message through the agent loop.
-// It builds the prompt, calls the LLM, executes any tool calls in a loop,
-// and returns the final text response.
-// If streamCb is non-nil, LLM responses are streamed and the callback is
-// invoked for each text delta.
-func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage, streamCb llm.StreamCallback) (*llm.ChatResponse, error) {
-	chatID := msg.ChatID
-	userText := msg.Text
+// loopOpts holds the parameters for a single run of the agent LLM-tool loop.
+type loopOpts struct {
+	session    *session.Session  // session whose History is used and mutated
+	tools      *tool.Registry    // tool registry for execution
+	toolDefs   []llm.FunctionDef // tool definitions sent to the LLM
+	prompt     string            // system prompt
+	streamCb   llm.StreamCallback
+	background bool // if true, the end_chat tool can terminate the loop
+}
 
-	ctx = tool.WithAgentID(ctx, a.Id)
-	session := a.GetSession(chatID)
-	if msg.Background {
-		session.Background = true
-	}
-	if msg.NoArchive {
-		session.NoArchive = true
-	}
-	defer func() { a.Sessions.Save(session) }()
+// runLoop is the core LLM-tool loop shared by HandleMessage and HandleSubTask.
+// It calls the LLM, executes any tool calls, appends results to the session
+// history, and repeats until the LLM produces a final text response or
+// MaxToolRounds is exceeded.
+func (a *Agent) runLoop(ctx context.Context, opts loopOpts) (*llm.ChatResponse, error) {
+	chatID := opts.session.ChatID
 
-	slog.Info("handling message",
-		"agent", a.Id,
-		"chat_id", chatID,
-		"text_len", len(userText),
-		"history_len", len(session.History),
-	)
-
-	// Build system prompt
-	agentFiles := prompt.AgentFiles{
-		Id: a.Config.Id,
-	}
-	systemPrompt := a.Builder.BuildSystemPrompt(agentFiles, a.Skills, msg)
-
-	// Add user message to history
-	session.AppendHistory(llm.NewMessage(llm.RoleUser, userText))
-
-	// Get tool definitions
-	toolDefs := a.Tools.LLMDefs()
-
-	// For background tasks, include end_chat so the LLM can signal that
-	// it has finished and no further rounds are needed.
-	if msg.Background {
-		toolDefs = append(toolDefs, tool.ToLLMDef(tool.SingleEndChatTool))
-	}
-
-	// Compress context if history exceeds token limit
-	if a.MaxTokens > 0 {
-		// Estimate tokens for history
-		estimated := estimateTokens(session.History)
-		if estimated > compressionThreshold(a.MaxTokens, a.CompressionRatio) {
-			compressed, err := compressHistory(ctx, a.Provider, a.Config.Model, session.History, a.MaxTokens, a.CompressionRatio)
-			if err != nil {
-				slog.Error("context compression error", "error", err)
-				// Continue with original history on error
-			} else {
-				session.History = compressed
-			}
-		}
-	}
-
-	// Main loop: call LLM, execute tools, repeat until no more tool calls
-	for round := 1; round < a.MaxToolRounds; round++ {
+	for round := 1; round <= a.MaxToolRounds; round++ {
 		req := &llm.ChatRequest{
 			Model:        a.Config.Model,
-			Instructions: systemPrompt,
-			Items:        session.History,
-			Functions:    toolDefs,
+			Instructions: opts.prompt,
+			Items:        opts.session.History,
+			Functions:    opts.toolDefs,
 		}
 
 		slog.Debug("calling LLM",
@@ -91,8 +49,8 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 			resp *llm.ChatResponse
 			err  error
 		)
-		if streamCb != nil {
-			resp, err = a.Provider.StreamChat(ctx, req, streamCb)
+		if opts.streamCb != nil {
+			resp, err = a.Provider.StreamChat(ctx, req, opts.streamCb)
 		} else {
 			resp, err = a.Provider.Chat(ctx, req)
 		}
@@ -111,7 +69,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 		// (including reasoning, text, etc.) to preserve full context.
 		if len(resp.FunctionCalls) == 0 {
 			for _, item := range resp.Items {
-				session.AppendHistory(item)
+				opts.session.AppendHistory(item)
 			}
 			slog.Info("message complete",
 				"agent", a.Id,
@@ -124,12 +82,12 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 
 		// Record all output items (reasoning + text + tool calls).
 		for _, item := range resp.Items {
-			session.AppendHistory(item)
+			opts.session.AppendHistory(item)
 		}
 
 		// Notify the channel about function calls
-		if streamCb != nil {
-			if err := streamCb(llm.StreamDelta{
+		if opts.streamCb != nil {
+			if err := opts.streamCb(llm.StreamDelta{
 				FunctionCalls: resp.FunctionCalls,
 			}); err != nil {
 				slog.Warn("stream callback error for function calls", "error", err)
@@ -146,7 +104,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 
 			// Handle end_chat directly — it is not in the registry and
 			// signals that the background task is done.
-			if fc.Name == tool.SingleEndChatTool.Name() {
+			if opts.background && fc.Name == tool.SingleEndChatTool.Name() {
 				slog.Info("end_chat signal received, ending conversation",
 					"agent", a.Id,
 					"chat_id", chatID,
@@ -156,7 +114,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 				break
 			}
 
-			result, err := a.Tools.Execute(ctx, fc.Name, json.RawMessage(fc.Arguments))
+			result, err := opts.tools.Execute(ctx, fc.Name, json.RawMessage(fc.Arguments))
 			if err != nil {
 				result = fmt.Sprintf("Error: %s", err.Error())
 				slog.Error("tool execution failed",
@@ -165,7 +123,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 				)
 			}
 
-			session.AppendHistory(llm.NewFunctionCallOutput(fc.CallID, result))
+			opts.session.AppendHistory(llm.NewFunctionCallOutput(fc.CallID, result))
 		}
 		if endChat {
 			return nil, nil
@@ -173,4 +131,72 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 	}
 
 	return nil, fmt.Errorf("exceeded maximum tool rounds (%d)", a.MaxToolRounds)
+}
+
+// HandleMessage processes an incoming message through the agent loop.
+// It builds the prompt, calls the LLM, executes any tool calls in a loop,
+// and returns the final text response.
+// If streamCb is non-nil, LLM responses are streamed and the callback is
+// invoked for each text delta.
+func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage, streamCb llm.StreamCallback) (*llm.ChatResponse, error) {
+	chatID := msg.ChatID
+	userText := msg.Text
+
+	ctx = tool.WithAgentID(ctx, a.Id)
+	sess := a.GetSession(chatID)
+	if msg.Background {
+		sess.Background = true
+	}
+	if msg.NoArchive {
+		sess.NoArchive = true
+	}
+	defer func() { a.Sessions.Save(sess) }()
+
+	slog.Info("handling message",
+		"agent", a.Id,
+		"chat_id", chatID,
+		"text_len", len(userText),
+		"history_len", len(sess.History),
+	)
+
+	// Build system prompt
+	agentFiles := prompt.AgentFiles{
+		Id:     a.Config.Id,
+		Agents: a.AllAgents,
+	}
+	systemPrompt := a.Builder.BuildSystemPrompt(agentFiles, a.Skills, msg)
+
+	// Add user message to history
+	sess.AppendHistory(llm.NewMessage(llm.RoleUser, userText))
+
+	// Get tool definitions
+	toolDefs := a.Tools.LLMDefs()
+
+	// For background tasks, include end_chat so the LLM can signal that
+	// it has finished and no further rounds are needed.
+	if msg.Background {
+		toolDefs = append(toolDefs, tool.ToLLMDef(tool.SingleEndChatTool))
+	}
+
+	// Compress context if history exceeds token limit
+	if a.MaxTokens > 0 {
+		estimated := estimateTokens(sess.History)
+		if estimated > compressionThreshold(a.MaxTokens, a.CompressionRatio) {
+			compressed, err := compressHistory(ctx, a.Provider, a.Config.Model, sess.History, a.MaxTokens, a.CompressionRatio)
+			if err != nil {
+				slog.Error("context compression error", "error", err)
+			} else {
+				sess.History = compressed
+			}
+		}
+	}
+
+	return a.runLoop(ctx, loopOpts{
+		session:    sess,
+		tools:      a.Tools,
+		toolDefs:   toolDefs,
+		prompt:     systemPrompt,
+		streamCb:   streamCb,
+		background: msg.Background,
+	})
 }

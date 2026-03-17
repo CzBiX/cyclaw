@@ -41,7 +41,8 @@ func ToLLMDef(t Tool) llm.FunctionDef {
 	}
 }
 
-func generateID() string {
+// GenerateID returns a short random alphanumeric identifier.
+func GenerateID() string {
 	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, 6)
 	for i := range b {

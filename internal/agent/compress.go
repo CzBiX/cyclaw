@@ -132,7 +132,7 @@ func adjustSplitPoint(history []llm.Item, splitIdx int) int {
 	}
 
 	// Move forward past any tool result items at the split point.
-	for splitIdx < len(history) && history[splitIdx].Type == llm.ItemTypeFunctionCallOutput {
+	for splitIdx < len(history) && (history[splitIdx].Type == llm.ItemTypeFunctionCallOutput || history[splitIdx].Type == llm.ItemTypeFunctionCall) {
 		splitIdx++
 	}
 

@@ -69,7 +69,7 @@ func (t *CronTool) Execute(_ context.Context, params json.RawMessage) (string, e
 			return "", fmt.Errorf("add requires schedule and action")
 		}
 		if p.ID == "" {
-			p.ID = fmt.Sprintf("task-%s", generateID())
+			p.ID = fmt.Sprintf("task-%s", GenerateID())
 		}
 
 		task := &scheduler.Task{
