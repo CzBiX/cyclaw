@@ -1,0 +1,42 @@
+dataDir: ./data
+# Enable debug logging for verbose output
+debug: false
+
+# Maximum number of LLM-tool loop iterations per message (default: 20)
+maxToolRounds: 20
+
+# Compression threshold as a ratio of maxTokens (default: 0.8).
+# When estimated token usage exceeds maxTokens * compressionRatio,
+# older messages are summarized to compress the context.
+compressionRatio: 0.8
+
+# Auto-archive sessions after this idle duration (default: 30m).
+# When a session has no interaction for this long, it is automatically
+# archived (summarized to diary) and cleared. Set to "0" to disable.
+sessionIdleTimeout: 30m
+
+llm:
+  provider: openai
+  baseUrl: https://api.openai.com/v1
+  apiKey: sk-key
+  model: "gpt-4o"
+  # Maximum context window size in tokens. When conversation history exceeds
+  # this limit, older messages are summarized to compress the context.
+  maxTokens: 128000
+
+telegram:
+  token: 123456:ABC-DEF1234
+  # Optional: restrict bot access to specific user IDs
+  # allowed_users:
+  #   - 123456789
+  # Optional: send tool calls to a separate chat
+  # verboseChat: -1001234567890
+
+scheduler:
+  enabled: true
+
+agents:
+  - id: "main"
+    default: true
+    # Optional: override the global model for this agent
+    # model: "gpt-4o-mini"
