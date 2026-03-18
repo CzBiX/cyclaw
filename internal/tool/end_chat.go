@@ -19,7 +19,7 @@ var SingleEndChatTool = &EndChatTool{}
 func (t *EndChatTool) Name() string { return "end_chat" }
 
 func (t *EndChatTool) Description() string {
-	return "Signal completion of a background/scheduled task to end the session."
+	return "Signal completion of a background/scheduled task to end the session. Only put this at the end of your response."
 }
 
 func (t *EndChatTool) Parameters() json.RawMessage {
