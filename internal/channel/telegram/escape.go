@@ -99,7 +99,7 @@ func escapeMarkdownV2(s string) string {
 		if r == '*' && i+1 < n && runes[i+1] == '*' {
 			if end, ok := matchPaired(runes, i+2, "**"); ok {
 				out.WriteRune('*')
-				writeEscapedRunes(&out, runes[i+1:end+1])
+				writeEscapedRunes(&out, runes[i+2:end])
 				out.WriteRune('*')
 				i = end + 2
 				continue

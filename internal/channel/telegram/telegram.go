@@ -96,6 +96,7 @@ func (t *Telegram) Send(ctx context.Context, msg *channel.OutgoingMessage) error
 	switch msg.ParseMode {
 	case "markdown":
 		params.ParseMode = models.ParseModeMarkdown
+		params.Text = escapeMarkdownV2(msg.Text)
 	case "html":
 		params.ParseMode = models.ParseModeHTML
 	}

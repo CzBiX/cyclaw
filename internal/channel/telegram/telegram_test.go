@@ -182,7 +182,17 @@ func TestEscapeMarkdownV2(t *testing.T) {
 		{
 			name:   "pipe escaped outside formatting 3",
 			input:  "**a** | 2026",
-			output: "*\\*a\\** \\| 2026",
+			output: "*a* \\| 2026",
+		},
+		{
+			name:   "pipe inside bold preserved",
+			input:  "*a | b*",
+			output: "*a \\| b*",
+		},
+		{
+			name:   "dash inside bold preserved",
+			input:  "*a - b*",
+			output: "*a \\- b*",
 		},
 		{
 			name:   "curly braces escaped",
