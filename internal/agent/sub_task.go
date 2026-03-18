@@ -48,7 +48,7 @@ func (a *Agent) HandleSubTask(ctx context.Context, task string, instructions str
 	if instructions != "" {
 		systemPrompt = instructions
 	} else {
-		agentFiles := prompt.AgentFiles{Id: a.Config.Id, Agents: a.AllAgents}
+		agentFiles := prompt.AgentFiles{Id: a.Config.Id}
 		msg := &channel.IncomingMessage{
 			ChannelID: "sub_task",
 			ChatID:    chatID,

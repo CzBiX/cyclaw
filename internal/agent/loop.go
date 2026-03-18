@@ -161,8 +161,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 
 	// Build system prompt
 	agentFiles := prompt.AgentFiles{
-		Id:     a.Config.Id,
-		Agents: a.AllAgents,
+		Id: a.Config.Id,
 	}
 	systemPrompt := a.Builder.BuildSystemPrompt(agentFiles, a.Skills, msg)
 

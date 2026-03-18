@@ -21,23 +21,29 @@ type SubTaskExecutor interface {
 
 // SubTaskTool delegates a task to another agent and returns the result.
 type SubTaskTool struct {
-	executor SubTaskExecutor
-	registry *Registry // parent registry, used to build filtered registries
+	executor   SubTaskExecutor
+	registry   *Registry // parent registry, used to build filtered registries
+	agentNames []string  // available agent names, shown in tool description
 }
 
 // NewSubTaskTool creates a new sub_task tool.
 // executor provides the ability to invoke an agent's sub-task loop.
 // registry is the parent tool registry used when filtering tools.
-func NewSubTaskTool(executor SubTaskExecutor, registry *Registry) *SubTaskTool {
-	return &SubTaskTool{executor: executor, registry: registry}
+// agentNames lists the available agents for inclusion in the tool description.
+func NewSubTaskTool(executor SubTaskExecutor, registry *Registry, agentNames []string) *SubTaskTool {
+	return &SubTaskTool{executor: executor, registry: registry, agentNames: agentNames}
 }
 
 func (t *SubTaskTool) Name() string { return "sub_task" }
 
 func (t *SubTaskTool) Description() string {
-	return "Delegate a task to another agent (or yourself). " +
+	desc := "Delegate a task to another agent (or yourself). " +
 		"The sub-agent runs a full LLM-tool loop in a fresh session and returns the final text response. " +
 		"Use this for complex multi-step tasks that benefit from focused, isolated execution."
+	if len(t.agentNames) > 0 {
+		desc += " Available agents: " + strings.Join(t.agentNames, ", ") + "."
+	}
+	return desc
 }
 
 func (t *SubTaskTool) Parameters() json.RawMessage {

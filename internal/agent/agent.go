@@ -28,26 +28,16 @@ type Agent struct {
 	Tools              *tool.Registry
 	Builder            *prompt.Builder
 	Skills             []*skill.Skill
-	AllAgents          []prompt.AgentInfo // all registered agents, for system prompt
-	MaxTokens          int                // context window size for compression
-	MaxToolRounds      int                // max LLM-tool loop iterations per message
-	CompressionRatio   float64            // compression threshold as ratio of maxTokens
-	SessionIdleTimeout time.Duration      // auto-archive sessions after this idle duration
+	MaxTokens          int           // context window size for compression
+	MaxToolRounds      int           // max LLM-tool loop iterations per message
+	CompressionRatio   float64       // compression threshold as ratio of maxTokens
+	SessionIdleTimeout time.Duration // auto-archive sessions after this idle duration
 	Diary              DiaryAppender
 	Sessions           session.Store
 }
 
 // NewAgent creates a new agent instance.
 func NewAgent(agentCfg config.AgentConfig, globalCfg *config.Config, provider llm.Provider, tools *tool.Registry, builder *prompt.Builder, skills []*skill.Skill, diary DiaryAppender, sessions session.Store) *Agent {
-	// Build the list of all agents for the system prompt.
-	allAgents := make([]prompt.AgentInfo, len(globalCfg.Agents))
-	for i, ac := range globalCfg.Agents {
-		allAgents[i] = prompt.AgentInfo{
-			Id:      ac.Id,
-			Current: ac.Id == agentCfg.Id,
-		}
-	}
-
 	return &Agent{
 		Id:                 agentCfg.Id,
 		Config:             agentCfg,
@@ -55,7 +45,6 @@ func NewAgent(agentCfg config.AgentConfig, globalCfg *config.Config, provider ll
 		Tools:              tools,
 		Builder:            builder,
 		Skills:             skills,
-		AllAgents:          allAgents,
 		MaxTokens:          globalCfg.LLM.MaxTokens,
 		MaxToolRounds:      globalCfg.MaxToolRounds,
 		CompressionRatio:   globalCfg.CompressionRatio,
