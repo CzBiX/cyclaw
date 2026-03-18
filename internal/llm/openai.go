@@ -177,8 +177,12 @@ func outputItemsToItems(outputItems []outputItem) []Item {
 				Arguments: item["arguments"].(string),
 			}))
 		case "reasoning":
-			// ignore it since it can't be used for mutiple providers
-			continue
+			if _, ok := item["encrypted_content"]; ok {
+				// ignore it since it can't be used for mutiple providers
+				continue
+			}
+
+			items = append(items, NewOtherItem(item))
 		default:
 			// Preserve the raw item as MessageOther (e.g. "reasoning").
 			delete(item, "id")
