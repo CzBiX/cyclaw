@@ -27,6 +27,7 @@ func (a *Agent) HandleSubTask(ctx context.Context, task string, instructions str
 	ctx = tool.WithAgentID(ctx, a.Id)
 
 	chatID := fmt.Sprintf("sub_task_%s", tool.GenerateID())
+	ctx = tool.WithChatID(ctx, chatID)
 
 	slog.Info("handling sub_task",
 		"agent", a.Id,

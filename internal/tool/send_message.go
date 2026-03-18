@@ -32,7 +32,7 @@ func NewSendMessageTool(sender channel.Sender, sessions SessionResolver) *SendMe
 func (t *SendMessageTool) Name() string { return "send_msg" }
 
 func (t *SendMessageTool) Description() string {
-	return "Proactively send a message to a chat/group."
+	return "Proactively send a message to another chat. Primarily intended for background/scheduled tasks to report results to a user-facing chat."
 }
 
 func (t *SendMessageTool) Parameters() json.RawMessage {
@@ -87,7 +87,14 @@ func (t *SendMessageTool) Execute(ctx context.Context, params json.RawMessage) (
 	// Record the sent message in the target chat's normal session so the
 	// agent has context about previously sent proactive messages when the
 	// user replies in that chat.
-	if t.sessions != nil {
+	//
+	// Skip recording when the target chat is the session currently running
+	// the tool loop.  In that case the LLM's own response items (including
+	// function_call entries) have already been appended to the session
+	// history, and inserting an extra assistant message here would break the
+	// required function_call → function_call_output ordering, causing the
+	// LLM API to reject the next request.
+	if t.sessions != nil && p.ChatID != ChatIDFrom(ctx) {
 		if store, sess := t.sessions.ResolveSession(p.ChatID); store != nil {
 			sess.AppendHistory(llm.NewMessage(llm.RoleAssistant, p.Text))
 			store.Save(sess)

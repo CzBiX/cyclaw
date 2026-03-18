@@ -143,6 +143,7 @@ func (a *Agent) HandleMessage(ctx context.Context, msg *channel.IncomingMessage,
 	userText := msg.Text
 
 	ctx = tool.WithAgentID(ctx, a.Id)
+	ctx = tool.WithChatID(ctx, chatID)
 	sess := a.GetSession(chatID)
 	if msg.Background {
 		sess.Background = true

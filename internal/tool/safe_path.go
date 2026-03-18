@@ -10,6 +10,7 @@ import (
 type contextKey string
 
 const agentIDKey contextKey = "agent_id"
+const chatIDKey contextKey = "chat_id"
 
 // WithAgentID returns a new context that carries the given agent ID.
 func WithAgentID(ctx context.Context, id string) context.Context {
@@ -19,6 +20,17 @@ func WithAgentID(ctx context.Context, id string) context.Context {
 // AgentIDFrom extracts the agent ID from the context.
 func AgentIDFrom(ctx context.Context) string {
 	id, _ := ctx.Value(agentIDKey).(string)
+	return id
+}
+
+// WithChatID returns a new context that carries the current chat ID.
+func WithChatID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, chatIDKey, id)
+}
+
+// ChatIDFrom extracts the current chat ID from the context.
+func ChatIDFrom(ctx context.Context) string {
+	id, _ := ctx.Value(chatIDKey).(string)
 	return id
 }
 
