@@ -388,15 +388,20 @@ func (o *OpenAI) StreamChat(ctx context.Context, req *ChatRequest, cb StreamCall
 		"usage", fullResp.Usage,
 	)
 
+	usage := Usage{}
+	if fullResp.Usage != nil {
+		usage = Usage{
+			PromptTokens:     fullResp.Usage.InputTokens,
+			CompletionTokens: fullResp.Usage.OutputTokens,
+			TotalTokens:      fullResp.Usage.TotalTokens,
+		}
+	}
+
 	return &ChatResponse{
 		Content:       content,
 		FunctionCalls: functionCalls,
 		Items:         outputItems,
-		Usage: Usage{
-			PromptTokens:     fullResp.Usage.InputTokens,
-			CompletionTokens: fullResp.Usage.OutputTokens,
-			TotalTokens:      fullResp.Usage.TotalTokens,
-		},
+		Usage:         usage,
 	}, nil
 }
 
