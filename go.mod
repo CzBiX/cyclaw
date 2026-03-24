@@ -4,7 +4,7 @@ go 1.25.1
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.0
-	github.com/go-telegram/bot v1.19.0
+	github.com/go-telegram/bot v1.20.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/viper v1.21.0
 	gopkg.in/yaml.v3 v3.0.1
