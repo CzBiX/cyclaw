@@ -348,7 +348,7 @@ func (o *OpenAI) StreamChat(ctx context.Context, req *ChatRequest, cb StreamCall
 				}
 			}
 
-		case "response.completed":
+		case "response.completed", "response.failed":
 			var ev responseDoneEvent
 			if err := json.Unmarshal([]byte(data), &ev); err != nil {
 				slog.Warn("failed to parse response done", "error", err)
@@ -376,6 +376,13 @@ func (o *OpenAI) StreamChat(ctx context.Context, req *ChatRequest, cb StreamCall
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("read stream: %w", err)
+	}
+	if fullResp.Error != nil {
+		slog.Warn("llm api error in stream",
+			"code", fullResp.Error.Code,
+			"message", fullResp.Error.Message,
+		)
+		return nil, fmt.Errorf("api error [%s]: %s", fullResp.Error.Code, fullResp.Error.Message)
 	}
 
 	outputItems, content, functionCalls := parseResponseOutput(fullResp.Output)
