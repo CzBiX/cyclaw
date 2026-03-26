@@ -264,7 +264,6 @@ func TestScheduler_CheckMissedFiresTask(t *testing.T) {
 		ID:       "missed-task",
 		Schedule: "0 * * * *", // every hour
 		Action:   "should be caught up",
-		LastRun:  &twoHoursAgo,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -310,11 +309,11 @@ func TestScheduler_CheckMissedSkipsRecentTask(t *testing.T) {
 		ID:       "recent-task",
 		Schedule: "0 * * * *", // every hour
 		Action:   "recently ran",
-		LastRun:  &now,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	s1.mu.Lock()
+	s1.tasks["recent-task"].LastRun = &now
 	_ = s1.persistState()
 	s1.mu.Unlock()
 

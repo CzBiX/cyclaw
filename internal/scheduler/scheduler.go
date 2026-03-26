@@ -23,7 +23,7 @@ type Task struct {
 	Schedule string     `json:"schedule"`           // cron expression
 	Action   string     `json:"action"`             // description of what to do
 	AgentID  string     `json:"agent_id,omitempty"` // which agent should handle it
-	LastRun  *time.Time `json:"last_run,omitempty"` // last successful execution time
+	LastRun  *time.Time `json:"-"`                  // last successful execution time; persisted via state file only
 	system   bool
 }
 
@@ -282,9 +282,6 @@ func (s *Scheduler) markRun(taskID string) {
 	// Best-effort persist; errors are logged but not fatal.
 	if err := s.persistState(); err != nil {
 		slog.Warn("failed to persist state after marking task run", "id", taskID, "error", err)
-	}
-	if err := s.persist(); err != nil {
-		slog.Warn("failed to persist tasks after marking task run", "id", taskID, "error", err)
 	}
 }
 
